@@ -25,10 +25,10 @@ onmessage = function(e) {
         postMessage({ workTime, breakTime });
         timer = setInterval(() => {
             breakTime--;
-            postMessage({ workTime, breakTime });
-            if (breakTime <= 0) {
-                clearInterval(timer);
-                postMessage({ breakTime: 0, alert: true });
+            if (breakTime === 0) {
+                postMessage({ breakTime, alert: true });
+            } else {
+                postMessage({ workTime, breakTime });
             }
         }, 1000);
     }

@@ -83,21 +83,27 @@
 
         const updateTimeDisplay = (workTime, breakTime) => {
             $('#work-time').text(new Date(workTime * 1000).toISOString().substr(11, 8));
-            $('#break-time').text(new Date(breakTime * 1000).toISOString().substr(11, 8));
+            if (breakTime >= 0) {
+                $('#break-time').text(new Date(breakTime * 1000).toISOString().substr(11, 8));
+            } else {
+                const negativeBreakTime = -breakTime;
+                $('#break-time').text('-' + new Date(negativeBreakTime * 1000).toISOString().substr(11, 8));
+            }
         };
 
         worker.onmessage = function(e) {
             if (e.data.alert) {
                 new Notification('Break time is over!');
-                updateLogEntry('Break', true);
-            } else {
-                workTime = e.data.workTime;
-                breakTime = e.data.breakTime;
-                updateTimeDisplay(workTime, breakTime);
             }
+            workTime = e.data.workTime;
+            breakTime = e.data.breakTime;
+            updateTimeDisplay(workTime, breakTime);
         };
 
         const startWork = () => {
+            if (!isWorking && !isPaused) {
+                updateLogEntry('Break', true);
+            }
             isPaused = false;
             isWorking = true;
             startTime = new Date();
@@ -109,7 +115,7 @@
         };
 
         const startBreak = () => {
-            if (breakTime > 0) {
+            if (breakTime >= 0) {
                 initialBreakTime = breakTime;
                 isPaused = false;
                 isWorking = false;
@@ -176,11 +182,8 @@
                 if (type === 'Work') {
                     log[currentLogIndex].duration = $('#work-time').text();
                 } else {
-                    const usedBreakTime = initialBreakTime - breakTime;
-                    log[currentLogIndex].duration = new Date(usedBreakTime * 1000).toISOString().substr(11, 8);
-                    if (breakEnded) {
-                        log[currentLogIndex].duration = new Date(initialBreakTime * 1000).toISOString().substr(11, 8);
-                    }
+                    const totalBreakTime = initialBreakTime - breakTime;
+                    log[currentLogIndex].duration = (totalBreakTime >= 0 ? '' : '-') + new Date(Math.abs(totalBreakTime) * 1000).toISOString().substr(11, 8);
                 }
                 localStorage.setItem('workBreakLog', JSON.stringify(log));
                 updateLogDisplay();
