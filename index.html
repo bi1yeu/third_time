@@ -216,6 +216,11 @@
             });
         };
 
+        window.addEventListener('beforeunload', (event) => {
+            event.preventDefault();
+            event.returnValue = '';
+        });
+
         $(document).ready(() => {
             updateLogDisplay();
             updateTimeDisplay(workTime, breakTime);
