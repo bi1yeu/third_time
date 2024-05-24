@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Third Time Work Tracker</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        #log {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .editable {
+            border: 1px solid #ccc;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Third Time Work Tracker</h1>
+    <div>
+        <button id="start-work">Start Work</button>
+        <button id="start-break" disabled>Start Break</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="reset">Reset</button>
+    </div>
+    <div>
+        <h2>Work Time: <span id="work-time">00:00:00</span></h2>
+        <h2>Break Time: <span id="break-time">00:00:00</span></h2>
+        <p>Based on <a href="https://www.lesswrong.com/posts/RWu8eZqbwgB9zaerh/third-time-a-better-way-to-work" target="_blank">Third Time: a better way to work</a></p>
+    </div>
+    <div id="log">
+        <h2>Log</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Duration</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody id="log-list">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let workTime = 0;
+        let breakTime = 0;
+        let isPaused = true;
+        let isWorking = true;
+        let initialBreakTime = 0;
+        let startTime = null;
+        let endTime = null;
+        const worker = new Worker('timerWorker.js');
+
+        const updateTimeDisplay = (workTime, breakTime) => {
+            $('#work-time').text(new Date(workTime * 1000).toISOString().substr(11, 8));
+            $('#break-time').text(new Date(breakTime * 1000).toISOString().substr(11, 8));
+        };
+
+        worker.onmessage = function(e) {
+            if (e.data.alert) {
+                new Notification('Break time is over!');
+            } else {
+                workTime = e.data.workTime;
+                breakTime = e.data.breakTime;
+                updateTimeDisplay(workTime, breakTime);
+            }
+        };
+
+        const startWork = () => {
+            isPaused = false;
+            isWorking = true;
+            startTime = new Date();
+            $('#start-work').prop('disabled', true);
+            $('#start-break').prop('disabled', false);
+            $('#pause').prop('disabled', false).text('Pause');
+            worker.postMessage({ command: 'startWork', workTime });
+            logBreakTime();
+        };
+
+        const startBreak = () => {
+            if (breakTime > 0) {
+                initialBreakTime = breakTime;
+                isPaused = false;
+                isWorking = false;
+                endTime = new Date();
+                $('#start-work').prop('disabled', false);
+                $('#start-break').prop('disabled', true);
+                $('#pause').prop('disabled', false).text('Pause');
+                worker.postMessage({ command: 'startBreak', breakTime });
+                logWorkTime();
+                workTime = 0;
+                updateTimeDisplay(workTime, breakTime);
+                startTime = new Date();
+            }
+        };
+
+        const pause = () => {
+            if (isPaused) {
+                $('#pause').text('Pause');
+                if (isWorking) {
+                    worker.postMessage({ command: 'startWork', workTime });
+                } else {
+                    worker.postMessage({ command: 'startBreak', breakTime });
+                }
+            } else {
+                $('#pause').text('Resume');
+                worker.postMessage({ command: 'pause' });
+            }
+            isPaused = !isPaused;
+        };
+
+        const reset = () => {
+            worker.postMessage({ command: 'reset' });
+            workTime = 0;
+            breakTime = 0;
+            isPaused = true;
+            $('#pause').prop('disabled', true).text('Pause');
+            $('#start-work').prop('disabled', false);
+            $('#start-break').prop('disabled', true);
+            updateTimeDisplay(workTime, breakTime);
+        };
+
+        const logWorkTime = () => {
+            if (workTime > 0) {
+                const now = new Date();
+                const logEntry = {
+                    date: now.toLocaleDateString(),
+                    time: `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
+                    type: 'Work',
+                    duration: $('#work-time').text(),
+                    notes: ''
+                };
+                let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log.unshift(logEntry);
+                localStorage.setItem('workBreakLog', JSON.stringify(log));
+                updateLogDisplay();
+            }
+        };
+
+        const logBreakTime = () => {
+            if (initialBreakTime > 0) {
+                const now = new Date();
+                endTime = new Date();
+                const usedBreakTime = initialBreakTime - breakTime;
+                const logEntry = {
+                    date: now.toLocaleDateString(),
+                    time: `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
+                    type: 'Break',
+                    duration: new Date(usedBreakTime * 1000).toISOString().substr(11, 8),
+                    notes: ''
+                };
+                let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log.unshift(logEntry);
+                localStorage.setItem('workBreakLog', JSON.stringify(log));
+                updateLogDisplay();
+            }
+        };
+
+        const updateLogDisplay = () => {
+            const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+            $('#log-list').empty();
+            log.forEach((entry, index) => {
+                $('#log-list').append(`
+                    <tr>
+                        <td>${entry.date}</td>
+                        <td>${entry.time}</td>
+                        <td>${entry.type}</td>
+                        <td>${entry.duration}</td>
+                        <td contenteditable="true" class="editable" data-index="${index}">${entry.notes}</td>
+                    </tr>
+                `);
+            });
+
+            // Add event listeners for editable notes
+            $('.editable').on('blur', function() {
+                const index = $(this).data('index');
+                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log[index].notes = $(this).text();
+                localStorage.setItem('workBreakLog', JSON.stringify(log));
+            });
+        };
+
+        $(document).ready(() => {
+            updateLogDisplay();
+            updateTimeDisplay(workTime, breakTime);
+
+            $('#start-work').click(startWork);
+            $('#start-break').click(startBreak);
+            $('#pause').click(pause);
+            $('#reset').click(reset);
+
+            if (Notification.permission !== 'granted') {
+                Notification.requestPermission();
+            }
+        });
+    </script>
+</body>
+</html>
