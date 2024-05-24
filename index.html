@@ -31,6 +31,9 @@
         th {
             background-color: #f2f2f2;
         }
+        .break-entry {
+            background-color: #e0e0e0;
+        }
         .editable {
             border: 1px solid #ccc;
             padding: 5px;
@@ -75,6 +78,7 @@
         let initialBreakTime = 0;
         let startTime = null;
         let endTime = null;
+        let currentLogIndex = null;
         const worker = new Worker('timerWorker.js');
 
         const updateTimeDisplay = (workTime, breakTime) => {
@@ -85,6 +89,7 @@
         worker.onmessage = function(e) {
             if (e.data.alert) {
                 new Notification('Break time is over!');
+                updateLogEntry('Break', true);
             } else {
                 workTime = e.data.workTime;
                 breakTime = e.data.breakTime;
@@ -100,7 +105,7 @@
             $('#start-break').prop('disabled', false);
             $('#pause').prop('disabled', false).text('Pause');
             worker.postMessage({ command: 'startWork', workTime });
-            logBreakTime();
+            addLogEntry('Work');
         };
 
         const startBreak = () => {
@@ -113,10 +118,11 @@
                 $('#start-break').prop('disabled', true);
                 $('#pause').prop('disabled', false).text('Pause');
                 worker.postMessage({ command: 'startBreak', breakTime });
-                logWorkTime();
+                updateLogEntry('Work', false);
                 workTime = 0;
                 updateTimeDisplay(workTime, breakTime);
                 startTime = new Date();
+                addLogEntry('Break');
             }
         };
 
@@ -146,39 +152,39 @@
             updateTimeDisplay(workTime, breakTime);
         };
 
-        const logWorkTime = () => {
-            if (workTime > 0) {
-                const now = new Date();
-                const logEntry = {
-                    date: now.toLocaleDateString(),
-                    time: `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
-                    type: 'Work',
-                    duration: $('#work-time').text(),
-                    notes: ''
-                };
-                let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log.unshift(logEntry);
-                localStorage.setItem('workBreakLog', JSON.stringify(log));
-                updateLogDisplay();
-            }
+        const addLogEntry = (type) => {
+            const now = new Date();
+            const logEntry = {
+                date: now.toLocaleDateString(),
+                time: `${startTime.toLocaleTimeString()} - In progress...`,
+                type: type,
+                duration: 'In progress...',
+                notes: ''
+            };
+            let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+            log.unshift(logEntry);
+            localStorage.setItem('workBreakLog', JSON.stringify(log));
+            currentLogIndex = 0; // The new entry is at the start of the log
+            updateLogDisplay();
         };
 
-        const logBreakTime = () => {
-            if (initialBreakTime > 0) {
+        const updateLogEntry = (type, breakEnded) => {
+            if (currentLogIndex !== null) {
                 const now = new Date();
-                endTime = new Date();
-                const usedBreakTime = initialBreakTime - breakTime;
-                const logEntry = {
-                    date: now.toLocaleDateString(),
-                    time: `${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}`,
-                    type: 'Break',
-                    duration: new Date(usedBreakTime * 1000).toISOString().substr(11, 8),
-                    notes: ''
-                };
-                let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log.unshift(logEntry);
+                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log[currentLogIndex].time = `${startTime.toLocaleTimeString()} - ${now.toLocaleTimeString()}`;
+                if (type === 'Work') {
+                    log[currentLogIndex].duration = $('#work-time').text();
+                } else {
+                    const usedBreakTime = initialBreakTime - breakTime;
+                    log[currentLogIndex].duration = new Date(usedBreakTime * 1000).toISOString().substr(11, 8);
+                    if (breakEnded) {
+                        log[currentLogIndex].duration = new Date(initialBreakTime * 1000).toISOString().substr(11, 8);
+                    }
+                }
                 localStorage.setItem('workBreakLog', JSON.stringify(log));
                 updateLogDisplay();
+                currentLogIndex = null; // Reset the index
             }
         };
 
@@ -186,8 +192,9 @@
             const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
             $('#log-list').empty();
             log.forEach((entry, index) => {
+                const breakClass = entry.type === 'Break' ? 'break-entry' : '';
                 $('#log-list').append(`
-                    <tr>
+                    <tr class="${breakClass}">
                         <td>${entry.date}</td>
                         <td>${entry.time}</td>
                         <td>${entry.type}</td>
