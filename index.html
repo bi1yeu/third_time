@@ -147,16 +147,24 @@
             isPaused = !isPaused;
         };
 
-        const reset = () => {
-            worker.postMessage({ command: 'reset' });
-            workTime = 0;
-            breakTime = 0;
-            isPaused = true;
-            $('#pause').prop('disabled', true).text('Pause');
-            $('#start-work').prop('disabled', false);
-            $('#start-break').prop('disabled', true);
-            updateTimeDisplay(workTime, breakTime);
-        };
+	const reset = () => {
+	    if (currentLogIndex !== null) {
+		// Remove the in-progress log entry
+		let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+		log.splice(currentLogIndex, 1);
+		localStorage.setItem('workBreakLog', JSON.stringify(log));
+		currentLogIndex = null; // Reset the index
+		updateLogDisplay();
+	    }
+	    worker.postMessage({ command: 'reset' });
+	    workTime = 0;
+	    breakTime = 0;
+	    isPaused = true;
+	    $('#pause').prop('disabled', true).text('Pause');
+	    $('#start-work').prop('disabled', false);
+	    $('#start-break').prop('disabled', true);
+	    updateTimeDisplay(workTime, breakTime);
+	};
 
         const addLogEntry = (type) => {
             const now = new Date();
