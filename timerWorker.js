@@ -21,7 +21,7 @@ onmessage = function(e) {
         clearInterval(timer);
         isWorking = false;
         breakTime = e.data.breakTime;
-        workTime = 0; // Reset work time to 0 when break starts
+        workTime = 0;
         postMessage({ workTime, breakTime });
         timer = setInterval(() => {
             breakTime--;

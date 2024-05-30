@@ -38,6 +38,10 @@
             border: 1px solid #ccc;
             padding: 5px;
         }
+        .delete-btn {
+            color: red;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -63,6 +67,7 @@
                     <th>Type</th>
                     <th>Duration</th>
                     <th>Notes</th>
+                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="log-list">
@@ -147,24 +152,23 @@
             isPaused = !isPaused;
         };
 
-	const reset = () => {
-	    if (currentLogIndex !== null) {
-		// Remove the in-progress log entry
-		let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-		log.splice(currentLogIndex, 1);
-		localStorage.setItem('workBreakLog', JSON.stringify(log));
-		currentLogIndex = null; // Reset the index
-		updateLogDisplay();
-	    }
-	    worker.postMessage({ command: 'reset' });
-	    workTime = 0;
-	    breakTime = 0;
-	    isPaused = true;
-	    $('#pause').prop('disabled', true).text('Pause');
-	    $('#start-work').prop('disabled', false);
-	    $('#start-break').prop('disabled', true);
-	    updateTimeDisplay(workTime, breakTime);
-	};
+        const reset = () => {
+            if (currentLogIndex !== null) {
+                let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log.splice(currentLogIndex, 1);
+                localStorage.setItem('workBreakLog', JSON.stringify(log));
+                currentLogIndex = null;
+                updateLogDisplay();
+            }
+            worker.postMessage({ command: 'reset' });
+            workTime = 0;
+            breakTime = 0;
+            isPaused = true;
+            $('#pause').prop('disabled', true).text('Pause');
+            $('#start-work').prop('disabled', false);
+            $('#start-break').prop('disabled', true);
+            updateTimeDisplay(workTime, breakTime);
+        };
 
         const addLogEntry = (type) => {
             const now = new Date();
@@ -178,7 +182,7 @@
             let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
             log.unshift(logEntry);
             localStorage.setItem('workBreakLog', JSON.stringify(log));
-            currentLogIndex = 0; // The new entry is at the start of the log
+            currentLogIndex = 0;
             updateLogDisplay();
         };
 
@@ -195,8 +199,32 @@
                 }
                 localStorage.setItem('workBreakLog', JSON.stringify(log));
                 updateLogDisplay();
-                currentLogIndex = null; // Reset the index
+                currentLogIndex = null;
             }
+        };
+
+        const parseTime = (timeString) => {
+            const [time, modifier] = timeString.split(' ');
+            let [hours, minutes, seconds] = time.split(':').map(Number);
+            if (modifier === 'PM' && hours !== 12) {
+                hours += 12;
+            }
+            if (modifier === 'AM' && hours === 12) {
+                hours = 0;
+            }
+            return { hours, minutes, seconds };
+        };
+
+        const calculateDuration = (startTime, endTime) => {
+            const start = parseTime(startTime);
+            const end = parseTime(endTime);
+            const startDate = new Date(1970, 0, 1, start.hours, start.minutes, start.seconds);
+            const endDate = new Date(1970, 0, 1, end.hours, end.minutes, end.seconds);
+            const duration = (endDate - startDate) / 1000;
+            if (!isNaN(duration)) {
+                return new Date(duration * 1000).toISOString().substr(11, 8);
+            }
+            return 'Invalid time range';
         };
 
         const updateLogDisplay = () => {
@@ -207,20 +235,40 @@
                 $('#log-list').append(`
                     <tr class="${breakClass}">
                         <td>${entry.date}</td>
-                        <td>${entry.time}</td>
+                        <td contenteditable="true" class="editable-time" data-index="${index}">${entry.time}</td>
                         <td>${entry.type}</td>
                         <td>${entry.duration}</td>
-                        <td contenteditable="true" class="editable" data-index="${index}">${entry.notes}</td>
+                        <td contenteditable="true" class="editable-notes" data-index="${index}">${entry.notes}</td>
+                        <td><span class="delete-btn" data-index="${index}">Delete</span></td>
                     </tr>
                 `);
             });
 
-            // Add event listeners for editable notes
-            $('.editable').on('blur', function() {
+            $('.editable-time').on('blur', function() {
+                const index = $(this).data('index');
+                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log[index].time = $(this).text();
+                const times = log[index].time.split(' - ');
+                if (times.length === 2) {
+                    log[index].duration = calculateDuration(times[0], times[1]);
+                }
+                localStorage.setItem('workBreakLog', JSON.stringify(log));
+                updateLogDisplay();
+            });
+
+            $('.editable-notes').on('blur', function() {
                 const index = $(this).data('index');
                 const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
                 log[index].notes = $(this).text();
                 localStorage.setItem('workBreakLog', JSON.stringify(log));
+            });
+
+            $('.delete-btn').on('click', function() {
+                const index = $(this).data('index');
+                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
+                log.splice(index, 1);
+                localStorage.setItem('workBreakLog', JSON.stringify(log));
+                updateLogDisplay();
             });
         };
 
