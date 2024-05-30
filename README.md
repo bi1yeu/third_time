@@ -2,4 +2,5 @@ A work timer and tracker based on [Third Time: a better way to work](https://www
 
 Written largely by ChatGPT 😅
 
-<img width="1498" alt="Screenshot 2024-05-24 at 4 36 04 PM" src="https://github.com/bi1yeu/third_time/assets/1185129/3d8bae36-ca48-4d28-9953-805f8fa1411e">
+<img width="1453" alt="Screenshot 2024-05-30 at 6 11 27 PM" src="https://github.com/bi1yeu/third_time/assets/1185129/de9c2515-6289-4ae3-a9d8-140dd0e24949">
+
