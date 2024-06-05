@@ -12,7 +12,7 @@ onmessage = function (e) {
     workTime = e.data.workTime;
     timer = setInterval(() => {
       workTime++;
-      breakTime = Math.floor(workTime / 3);
+      breakTime += 1.0 / 3.0;
       postMessage({ workTime, breakTime });
     }, 1000);
   }
@@ -25,7 +25,7 @@ onmessage = function (e) {
     postMessage({ workTime, breakTime });
     timer = setInterval(() => {
       breakTime--;
-      if (breakTime === 0) {
+      if (Math.floor(breakTime) === 0) {
         postMessage({ breakTime, alert: true });
       } else {
         postMessage({ workTime, breakTime });
