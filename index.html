@@ -1,238 +1,251 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Third Time Work Tracker</title>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 50px;
-        }
-        button {
-            margin: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
-        }
-        #log {
-            margin-top: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 8px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        .break-entry {
-            background-color: #e0e0e0;
-        }
-        .editable {
-            border: 1px solid #ccc;
-            padding: 5px;
-        }
-        .delete-btn {
-            color: red;
-            cursor: pointer;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin: 50px;
+      }
+      button {
+        margin: 10px;
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+      #log {
+        margin-top: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        padding: 8px;
+        border: 1px solid #ddd;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      .break-entry {
+        background-color: #e0e0e0;
+      }
+      .editable {
+        border: 1px solid #ccc;
+        padding: 5px;
+      }
+      .delete-btn {
+        color: red;
+        cursor: pointer;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Third Time Work Tracker</h1>
     <div>
-        <button id="start-work">Start Work</button>
-        <button id="start-break" disabled>Start Break</button>
-        <button id="pause" disabled>Pause</button>
-        <button id="reset">Reset</button>
+      <button id="start-work">Start Work</button>
+      <button id="start-break" disabled>Start Break</button>
+      <button id="stop">Stop</button>
     </div>
     <div>
-        <h2>Work Time: <span id="work-time">00:00:00</span></h2>
-        <h2>Break Time: <span id="break-time">00:00:00</span></h2>
-        <p>Based on <a href="https://www.lesswrong.com/posts/RWu8eZqbwgB9zaerh/third-time-a-better-way-to-work" target="_blank">Third Time: a better way to work</a></p>
+      <h2>Work Time: <span id="work-time">00:00:00</span></h2>
+      <h2>Break Time: <span id="break-time">00:00:00</span></h2>
+      <p>
+        Based on
+        <a
+          href="https://www.lesswrong.com/posts/RWu8eZqbwgB9zaerh/third-time-a-better-way-to-work"
+          target="_blank"
+          >Third Time: a better way to work</a
+        >
+      </p>
     </div>
     <div id="log">
-        <h2>Log</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>Time</th>
-                    <th>Type</th>
-                    <th>Duration</th>
-                    <th>Notes</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody id="log-list">
-            </tbody>
-        </table>
+      <h2>Log</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Duration</th>
+            <th>Notes</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="log-list"></tbody>
+      </table>
     </div>
 
     <script>
-        let workTime = 0;
-        let breakTime = 0;
-        let isPaused = true;
-        let isWorking = true;
-        let initialBreakTime = 0;
-        let startTime = null;
-        let endTime = null;
-        let currentLogIndex = null;
-        const worker = new Worker('timerWorker.js');
+      let workTime = 0;
+      let breakTime = 0;
+      let isWorking = true;
+      let initialBreakTime = 0;
+      let startTime = null;
+      let endTime = null;
+      let currentLogIndex = null;
+      const worker = new Worker("timerWorker.js");
+      const breakAlertSound = document.getElementById("break-alert-sound");
 
-        const updateTimeDisplay = (workTime, breakTime) => {
-            $('#work-time').text(new Date(workTime * 1000).toISOString().substr(11, 8));
-            if (breakTime >= 0) {
-                $('#break-time').text(new Date(breakTime * 1000).toISOString().substr(11, 8));
-            } else {
-                const negativeBreakTime = -breakTime;
-                $('#break-time').text('-' + new Date(negativeBreakTime * 1000).toISOString().substr(11, 8));
-            }
+      const updateTimeDisplay = (workTime, breakTime) => {
+        $("#work-time").text(
+          new Date(workTime * 1000).toISOString().substr(11, 8)
+        );
+        if (breakTime >= 0) {
+          $("#break-time").text(
+            new Date(breakTime * 1000).toISOString().substr(11, 8)
+          );
+        } else {
+          const negativeBreakTime = -breakTime;
+          $("#break-time").text(
+            "-" + new Date(negativeBreakTime * 1000).toISOString().substr(11, 8)
+          );
+        }
+      };
+
+      worker.onmessage = function (e) {
+        if (e.data.alert) {
+          new Notification("Break time is over!");
+        }
+        workTime = e.data.workTime;
+        breakTime = e.data.breakTime;
+        updateTimeDisplay(workTime, breakTime);
+      };
+
+      const startWork = () => {
+        debugger;
+        if (!isWorking) {
+          updateLogEntry("Break", true);
+        }
+        isWorking = true;
+        startTime = new Date();
+        $("#start-work").prop("disabled", true);
+        $("#start-break").prop("disabled", false);
+        worker.postMessage({ command: "startWork", workTime });
+        addLogEntry("Work");
+      };
+
+      const startBreak = () => {
+        if (breakTime >= 0) {
+          initialBreakTime = breakTime;
+          isWorking = false;
+          endTime = new Date();
+          $("#start-work").prop("disabled", false);
+          $("#start-break").prop("disabled", true);
+          worker.postMessage({ command: "startBreak", breakTime });
+          updateLogEntry("Work", false);
+          workTime = 0;
+          updateTimeDisplay(workTime, breakTime);
+          startTime = new Date();
+          addLogEntry("Break");
+        }
+      };
+
+      const stop = () => {
+        if (currentLogIndex !== null) {
+          logEntryType = "Work";
+          if (!isWorking) {
+            logEntryType = "Break";
+          }
+          updateLogEntry(logEntryType, !isWorking);
+          currentLogIndex = null;
+        }
+        worker.postMessage({ command: "stop" });
+        workTime = 0;
+        breakTime = 0;
+        $("#start-work").prop("disabled", false);
+        $("#start-break").prop("disabled", true);
+        updateTimeDisplay(workTime, breakTime);
+      };
+
+      const addLogEntry = (type) => {
+        const now = new Date();
+        const logEntry = {
+          date: now.toLocaleDateString(),
+          time: `${startTime.toLocaleTimeString()} - In progress...`,
+          type: type,
+          duration: "In progress...",
+          notes: "",
         };
+        let log = JSON.parse(localStorage.getItem("workBreakLog")) || [];
+        log.unshift(logEntry);
+        localStorage.setItem("workBreakLog", JSON.stringify(log));
+        currentLogIndex = 0;
+        updateLogDisplay();
+      };
 
-        worker.onmessage = function(e) {
-            if (e.data.alert) {
-                new Notification('Break time is over!');
-            }
-            workTime = e.data.workTime;
-            breakTime = e.data.breakTime;
-            updateTimeDisplay(workTime, breakTime);
-        };
+      const updateLogEntry = (type, breakEnded) => {
+        if (currentLogIndex !== null) {
+          const now = new Date();
+          const log = JSON.parse(localStorage.getItem("workBreakLog")) || [];
+          log[
+            currentLogIndex
+          ].time = `${startTime.toLocaleTimeString()} - ${now.toLocaleTimeString()}`;
+          if (type === "Work") {
+            log[currentLogIndex].duration = $("#work-time").text();
+          } else {
+            const totalBreakTime = initialBreakTime - breakTime;
+            log[currentLogIndex].duration =
+              (totalBreakTime >= 0 ? "" : "-") +
+              new Date(Math.abs(totalBreakTime) * 1000)
+                .toISOString()
+                .substr(11, 8);
+          }
+          localStorage.setItem("workBreakLog", JSON.stringify(log));
+          updateLogDisplay();
+          currentLogIndex = null;
+        }
+      };
 
-        const startWork = () => {
-            if (!isWorking && !isPaused) {
-                updateLogEntry('Break', true);
-            }
-            isPaused = false;
-            isWorking = true;
-            startTime = new Date();
-            $('#start-work').prop('disabled', true);
-            $('#start-break').prop('disabled', false);
-            $('#pause').prop('disabled', false).text('Pause');
-            worker.postMessage({ command: 'startWork', workTime });
-            addLogEntry('Work');
-        };
+      const parseTime = (timeString) => {
+        const [time, modifier] = timeString.split(" ");
+        let [hours, minutes, seconds] = time.split(":").map(Number);
+        if (modifier === "PM" && hours !== 12) {
+          hours += 12;
+        }
+        if (modifier === "AM" && hours === 12) {
+          hours = 0;
+        }
+        return { hours, minutes, seconds };
+      };
 
-        const startBreak = () => {
-            if (breakTime >= 0) {
-                initialBreakTime = breakTime;
-                isPaused = false;
-                isWorking = false;
-                endTime = new Date();
-                $('#start-work').prop('disabled', false);
-                $('#start-break').prop('disabled', true);
-                $('#pause').prop('disabled', false).text('Pause');
-                worker.postMessage({ command: 'startBreak', breakTime });
-                updateLogEntry('Work', false);
-                workTime = 0;
-                updateTimeDisplay(workTime, breakTime);
-                startTime = new Date();
-                addLogEntry('Break');
-            }
-        };
+      const calculateDuration = (startTime, endTime) => {
+        const start = parseTime(startTime);
+        const end = parseTime(endTime);
+        const startDate = new Date(
+          1970,
+          0,
+          1,
+          start.hours,
+          start.minutes,
+          start.seconds
+        );
+        const endDate = new Date(
+          1970,
+          0,
+          1,
+          end.hours,
+          end.minutes,
+          end.seconds
+        );
+        const duration = (endDate - startDate) / 1000;
+        if (!isNaN(duration)) {
+          return new Date(duration * 1000).toISOString().substr(11, 8);
+        }
+        return "Invalid time range";
+      };
 
-        const pause = () => {
-            if (isPaused) {
-                $('#pause').text('Pause');
-                if (isWorking) {
-                    worker.postMessage({ command: 'startWork', workTime });
-                } else {
-                    worker.postMessage({ command: 'startBreak', breakTime });
-                }
-            } else {
-                $('#pause').text('Resume');
-                worker.postMessage({ command: 'pause' });
-            }
-            isPaused = !isPaused;
-        };
-
-        const reset = () => {
-            if (currentLogIndex !== null) {
-                let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log.splice(currentLogIndex, 1);
-                localStorage.setItem('workBreakLog', JSON.stringify(log));
-                currentLogIndex = null;
-                updateLogDisplay();
-            }
-            worker.postMessage({ command: 'reset' });
-            workTime = 0;
-            breakTime = 0;
-            isPaused = true;
-            $('#pause').prop('disabled', true).text('Pause');
-            $('#start-work').prop('disabled', false);
-            $('#start-break').prop('disabled', true);
-            updateTimeDisplay(workTime, breakTime);
-        };
-
-        const addLogEntry = (type) => {
-            const now = new Date();
-            const logEntry = {
-                date: now.toLocaleDateString(),
-                time: `${startTime.toLocaleTimeString()} - In progress...`,
-                type: type,
-                duration: 'In progress...',
-                notes: ''
-            };
-            let log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-            log.unshift(logEntry);
-            localStorage.setItem('workBreakLog', JSON.stringify(log));
-            currentLogIndex = 0;
-            updateLogDisplay();
-        };
-
-        const updateLogEntry = (type, breakEnded) => {
-            if (currentLogIndex !== null) {
-                const now = new Date();
-                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log[currentLogIndex].time = `${startTime.toLocaleTimeString()} - ${now.toLocaleTimeString()}`;
-                if (type === 'Work') {
-                    log[currentLogIndex].duration = $('#work-time').text();
-                } else {
-                    const totalBreakTime = initialBreakTime - breakTime;
-                    log[currentLogIndex].duration = (totalBreakTime >= 0 ? '' : '-') + new Date(Math.abs(totalBreakTime) * 1000).toISOString().substr(11, 8);
-                }
-                localStorage.setItem('workBreakLog', JSON.stringify(log));
-                updateLogDisplay();
-                currentLogIndex = null;
-            }
-        };
-
-        const parseTime = (timeString) => {
-            const [time, modifier] = timeString.split(' ');
-            let [hours, minutes, seconds] = time.split(':').map(Number);
-            if (modifier === 'PM' && hours !== 12) {
-                hours += 12;
-            }
-            if (modifier === 'AM' && hours === 12) {
-                hours = 0;
-            }
-            return { hours, minutes, seconds };
-        };
-
-        const calculateDuration = (startTime, endTime) => {
-            const start = parseTime(startTime);
-            const end = parseTime(endTime);
-            const startDate = new Date(1970, 0, 1, start.hours, start.minutes, start.seconds);
-            const endDate = new Date(1970, 0, 1, end.hours, end.minutes, end.seconds);
-            const duration = (endDate - startDate) / 1000;
-            if (!isNaN(duration)) {
-                return new Date(duration * 1000).toISOString().substr(11, 8);
-            }
-            return 'Invalid time range';
-        };
-
-        const updateLogDisplay = () => {
-            const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-            $('#log-list').empty();
-            log.forEach((entry, index) => {
-                const breakClass = entry.type === 'Break' ? 'break-entry' : '';
-                $('#log-list').append(`
+      const updateLogDisplay = () => {
+        const log = JSON.parse(localStorage.getItem("workBreakLog")) || [];
+        $("#log-list").empty();
+        log.forEach((entry, index) => {
+          const breakClass = entry.type === "Break" ? "break-entry" : "";
+          $("#log-list").append(`
                     <tr class="${breakClass}">
                         <td>${entry.date}</td>
                         <td contenteditable="true" class="editable-time" data-index="${index}">${entry.time}</td>
@@ -242,54 +255,53 @@
                         <td><span class="delete-btn" data-index="${index}">Delete</span></td>
                     </tr>
                 `);
-            });
-
-            $('.editable-time').on('blur', function() {
-                const index = $(this).data('index');
-                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log[index].time = $(this).text();
-                const times = log[index].time.split(' - ');
-                if (times.length === 2) {
-                    log[index].duration = calculateDuration(times[0], times[1]);
-                }
-                localStorage.setItem('workBreakLog', JSON.stringify(log));
-                updateLogDisplay();
-            });
-
-            $('.editable-notes').on('blur', function() {
-                const index = $(this).data('index');
-                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log[index].notes = $(this).text();
-                localStorage.setItem('workBreakLog', JSON.stringify(log));
-            });
-
-            $('.delete-btn').on('click', function() {
-                const index = $(this).data('index');
-                const log = JSON.parse(localStorage.getItem('workBreakLog')) || [];
-                log.splice(index, 1);
-                localStorage.setItem('workBreakLog', JSON.stringify(log));
-                updateLogDisplay();
-            });
-        };
-
-        window.addEventListener('beforeunload', (event) => {
-            event.preventDefault();
-            event.returnValue = '';
         });
 
-        $(document).ready(() => {
-            updateLogDisplay();
-            updateTimeDisplay(workTime, breakTime);
-
-            $('#start-work').click(startWork);
-            $('#start-break').click(startBreak);
-            $('#pause').click(pause);
-            $('#reset').click(reset);
-
-            if (Notification.permission !== 'granted') {
-                Notification.requestPermission();
-            }
+        $(".editable-time").on("blur", function () {
+          const index = $(this).data("index");
+          const log = JSON.parse(localStorage.getItem("workBreakLog")) || [];
+          log[index].time = $(this).text();
+          const times = log[index].time.split(" - ");
+          if (times.length === 2) {
+            log[index].duration = calculateDuration(times[0], times[1]);
+          }
+          localStorage.setItem("workBreakLog", JSON.stringify(log));
+          updateLogDisplay();
         });
+
+        $(".editable-notes").on("blur", function () {
+          const index = $(this).data("index");
+          const log = JSON.parse(localStorage.getItem("workBreakLog")) || [];
+          log[index].notes = $(this).text();
+          localStorage.setItem("workBreakLog", JSON.stringify(log));
+        });
+
+        $(".delete-btn").on("click", function () {
+          const index = $(this).data("index");
+          const log = JSON.parse(localStorage.getItem("workBreakLog")) || [];
+          log.splice(index, 1);
+          localStorage.setItem("workBreakLog", JSON.stringify(log));
+          updateLogDisplay();
+        });
+      };
+
+      window.addEventListener("beforeunload", (event) => {
+        event.preventDefault();
+        event.returnValue = "";
+      });
+
+      $(document).ready(() => {
+        updateLogDisplay();
+        updateTimeDisplay(workTime, breakTime);
+
+        $("#start-work").click(startWork);
+        $("#start-break").click(startBreak);
+        $("#stop").click(stop);
+
+        if (Notification.permission !== "granted") {
+          Notification.requestPermission();
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
